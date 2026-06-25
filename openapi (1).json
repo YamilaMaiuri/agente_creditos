@@ -1,0 +1,401 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BNA - API Créditos Hipotecarios",
+    "description": "API para consultar RENAPER, BCRA y AFIP en el flujo de solicitud de créditos hipotecarios del BNA",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://creditos-app.2925a7i62z1m.us-east.codeengine.appdomain.cloud",
+      "description": "Code Engine - Producción"
+    }
+  ],
+  "paths": {
+    "/renaper/{dni}": {
+      "get": {
+        "tags": ["RENAPER"],
+        "summary": "Consultar RENAPER por DNI",
+        "description": "Devuelve nombre completo, CUIL, fecha de nacimiento y domicilio registrado en el padrón del RENAPER.",
+        "operationId": "consultar_renaper",
+        "parameters": [
+          {
+            "name": "dni",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "DNI"
+            },
+            "description": "Número de DNI del solicitante (solo dígitos, sin puntos ni espacios)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos de identidad del solicitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenaperResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DNI no encontrado en el padrón RENAPER"
+          }
+        }
+      }
+    },
+    "/bcra/{cuil}": {
+      "get": {
+        "tags": ["BCRA"],
+        "summary": "Consultar BCRA por CUIL",
+        "description": "Devuelve la situación crediticia, score, deudas activas e informes negativos en los últimos 12 meses.",
+        "operationId": "consultar_bcra",
+        "parameters": [
+          {
+            "name": "cuil",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "CUIL"
+            },
+            "description": "CUIL del solicitante en formato XX-XXXXXXXX-X"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Situación crediticia del solicitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BcraResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "CUIL no encontrado en el registro BCRA"
+          }
+        }
+      }
+    },
+    "/propiedades": {
+      "get": {
+        "tags": ["Propiedades"],
+        "summary": "Buscar propiedades en +Hogares BNA",
+        "description": "Devuelve un listado de propiedades disponibles en el portal +Hogares con BNA compatibles con el monto aprobado y la ubicación deseada.",
+        "operationId": "buscar_propiedades",
+        "parameters": [
+          {
+            "name": "precio_max",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Precio máximo en pesos"
+            },
+            "description": "Precio máximo de la propiedad en pesos (= monto crédito aprobado / 0.75)"
+          },
+          {
+            "name": "localidad",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Localidad o barrio"
+            },
+            "description": "Localidad o barrio donde el cliente quiere buscar"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Listado de propiedades disponibles aptas para crédito hipotecario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PropiedadResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No se encontraron propiedades disponibles para los filtros indicados"
+          }
+        }
+      }
+    },
+    "/propiedades/{id}/reserva": {
+      "post": {
+        "tags": ["Propiedades"],
+        "summary": "Reservar una propiedad en +Hogares BNA",
+        "description": "Genera una reserva sobre la propiedad seleccionada para el solicitante.",
+        "operationId": "reservar_propiedad",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "ID de la propiedad"
+            },
+            "description": "ID de la propiedad obtenido del endpoint buscar_propiedades"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reserva confirmada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservaResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La propiedad ya no está disponible"
+          }
+        }
+      }
+    },
+    "/afip/{cuil}": {
+      "get": {
+        "tags": ["AFIP"],
+        "summary": "Consultar AFIP por CUIL",
+        "description": "Devuelve la categoría tributaria, empleador o actividad según corresponda, estado fiscal y fecha de inscripción en AFIP/ARCA.",
+        "operationId": "consultar_afip",
+        "parameters": [
+          {
+            "name": "cuil",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "CUIL"
+            },
+            "description": "CUIL del solicitante en formato XX-XXXXXXXX-X"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Situación impositiva del solicitante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AfipResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "CUIL no encontrado en el padrón AFIP"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PropiedadResponse": {
+        "type": "object",
+        "title": "PropiedadResponse",
+        "required": ["id", "direccion", "localidad", "tipo", "superficie_m2", "ambientes", "precio_pesos", "apta_hipoteca", "estado_documental"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "ID de la propiedad"
+          },
+          "direccion": {
+            "type": "string",
+            "title": "Dirección"
+          },
+          "localidad": {
+            "type": "string",
+            "title": "Localidad o barrio"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo de inmueble",
+            "description": "Ej: Departamento, PH, Casa"
+          },
+          "superficie_m2": {
+            "type": "integer",
+            "title": "Superficie en m²"
+          },
+          "ambientes": {
+            "type": "integer",
+            "title": "Cantidad de ambientes"
+          },
+          "precio_pesos": {
+            "type": "integer",
+            "title": "Precio en pesos"
+          },
+          "apta_hipoteca": {
+            "type": "boolean",
+            "title": "Apta para crédito hipotecario BNA"
+          },
+          "estado_documental": {
+            "type": "string",
+            "title": "Estado de la documentación",
+            "description": "Valores posibles: verificada, en_proceso"
+          }
+        }
+      },
+      "ReservaRequest": {
+        "type": "object",
+        "title": "ReservaRequest",
+        "required": ["cuil_cliente", "nombre_cliente"],
+        "properties": {
+          "cuil_cliente": {
+            "type": "string",
+            "title": "CUIL del solicitante"
+          },
+          "nombre_cliente": {
+            "type": "string",
+            "title": "Nombre completo del solicitante"
+          }
+        }
+      },
+      "ReservaResponse": {
+        "type": "object",
+        "title": "ReservaResponse",
+        "required": ["id_reserva", "id_propiedad", "confirmada", "vigencia_dias"],
+        "properties": {
+          "id_reserva": {
+            "type": "string",
+            "title": "ID de la reserva"
+          },
+          "id_propiedad": {
+            "type": "string",
+            "title": "ID de la propiedad reservada"
+          },
+          "confirmada": {
+            "type": "boolean",
+            "title": "Reserva confirmada"
+          },
+          "vigencia_dias": {
+            "type": "integer",
+            "title": "Días de vigencia de la reserva"
+          },
+          "mensaje": {
+            "type": "string",
+            "title": "Mensaje de confirmación"
+          }
+        }
+      },
+      "RenaperResponse": {
+        "type": "object",
+        "title": "RenaperResponse",
+        "required": ["dni", "nombre_completo", "cuil", "fecha_nacimiento", "domicilio"],
+        "properties": {
+          "dni": {
+            "type": "string",
+            "title": "DNI"
+          },
+          "nombre_completo": {
+            "type": "string",
+            "title": "Nombre completo"
+          },
+          "cuil": {
+            "type": "string",
+            "title": "CUIL"
+          },
+          "fecha_nacimiento": {
+            "type": "string",
+            "title": "Fecha de nacimiento",
+            "description": "Formato YYYY-MM-DD"
+          },
+          "domicilio": {
+            "type": "string",
+            "title": "Domicilio registrado"
+          }
+        }
+      },
+      "BcraResponse": {
+        "type": "object",
+        "title": "BcraResponse",
+        "required": ["cuil", "situacion", "score", "deudas_activas_pesos", "informes_negativos_12m"],
+        "properties": {
+          "cuil": {
+            "type": "string",
+            "title": "CUIL"
+          },
+          "situacion": {
+            "type": "string",
+            "title": "Situación crediticia",
+            "description": "Ej: 1 - Normal, 2 - Riesgo bajo, etc."
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score crediticio"
+          },
+          "deudas_activas_pesos": {
+            "type": "integer",
+            "title": "Deudas activas en pesos"
+          },
+          "informes_negativos_12m": {
+            "type": "boolean",
+            "title": "Informes negativos últimos 12 meses"
+          }
+        }
+      },
+      "AfipResponse": {
+        "type": "object",
+        "title": "AfipResponse",
+        "required": ["cuil", "categoria", "estado", "fecha_inscripcion"],
+        "properties": {
+          "cuil": {
+            "type": "string",
+            "title": "CUIL"
+          },
+          "categoria": {
+            "type": "string",
+            "title": "Categoría tributaria",
+            "description": "Valores posibles: relacion_dependencia, monotributista, autonomo"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado fiscal"
+          },
+          "fecha_inscripcion": {
+            "type": "string",
+            "title": "Fecha de inscripción",
+            "description": "Formato YYYY-MM-DD"
+          },
+          "empleador": {
+            "type": "string",
+            "title": "Empleador",
+            "description": "Solo presente si la categoría es relacion_dependencia"
+          },
+          "actividad": {
+            "type": "string",
+            "title": "Actividad",
+            "description": "Solo presente si la categoría es autonomo"
+          },
+          "categoria_monotributo": {
+            "type": "string",
+            "title": "Categoría de monotributo",
+            "description": "Solo presente si la categoría es monotributista"
+          }
+        }
+      }
+    }
+  }
+}
