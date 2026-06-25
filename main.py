@@ -141,6 +141,66 @@ AFIP_DB = {
     },
 }
 
+PROPIEDADES_DB = [
+    {
+        "id": "HOG-001",
+        "direccion": "Av. Corrientes 3840, Piso 5 Dto B",
+        "localidad": "CABA",
+        "tipo": "Departamento",
+        "superficie_m2": 52,
+        "ambientes": 2,
+        "precio_pesos": 145000000,
+        "apta_hipoteca": True,
+        "estado_documental": "verificada",
+    },
+    {
+        "id": "HOG-002",
+        "direccion": "Gurruchaga 1456, PB A",
+        "localidad": "CABA",
+        "tipo": "PH",
+        "superficie_m2": 68,
+        "ambientes": 3,
+        "precio_pesos": 185000000,
+        "apta_hipoteca": True,
+        "estado_documental": "verificada",
+    },
+    {
+        "id": "HOG-003",
+        "direccion": "San Lorenzo 892, Piso 2 Dto A",
+        "localidad": "Rosario",
+        "tipo": "Departamento",
+        "superficie_m2": 48,
+        "ambientes": 2,
+        "precio_pesos": 98000000,
+        "apta_hipoteca": True,
+        "estado_documental": "verificada",
+    },
+    {
+        "id": "HOG-004",
+        "direccion": "Colón 234, Piso 3 Dto B",
+        "localidad": "Córdoba Capital",
+        "tipo": "Departamento",
+        "superficie_m2": 55,
+        "ambientes": 2,
+        "precio_pesos": 112000000,
+        "apta_hipoteca": True,
+        "estado_documental": "verificada",
+    },
+    {
+        "id": "HOG-005",
+        "direccion": "Arístides Villanueva 540",
+        "localidad": "Mendoza Capital",
+        "tipo": "Casa",
+        "superficie_m2": 90,
+        "ambientes": 3,
+        "precio_pesos": 165000000,
+        "apta_hipoteca": True,
+        "estado_documental": "verificada",
+    },
+]
+
+RESERVAS_DB: dict = {}
+
 
 # ---------------------------------------------------------------------------
 # RESPONSE MODELS
@@ -170,6 +230,31 @@ class AfipResponse(BaseModel):
     empleador: str | None = None
     actividad: str | None = None
     categoria_monotributo: str | None = None
+
+
+class PropiedadResponse(BaseModel):
+    id: str
+    direccion: str
+    localidad: str
+    tipo: str
+    superficie_m2: int
+    ambientes: int
+    precio_pesos: int
+    apta_hipoteca: bool
+    estado_documental: str
+
+
+class ReservaRequest(BaseModel):
+    cuil_cliente: str
+    nombre_cliente: str
+
+
+class ReservaResponse(BaseModel):
+    id_reserva: str
+    id_propiedad: str
+    confirmada: bool
+    vigencia_dias: int
+    mensaje: str
 
 
 # ---------------------------------------------------------------------------
@@ -244,3 +329,73 @@ def consultar_afip(cuil: str):
             detail=f"CUIL {cuil} no encontrado en el padrón AFIP.",
         )
     return {k: v for k, v in registro.items() if v is not None}
+
+
+@app.get(
+    "/propiedades",
+    response_model=list[PropiedadResponse],
+    summary="Buscar propiedades en +Hogares BNA",
+    description=(
+        "Devuelve un listado de propiedades disponibles en el portal +Hogares "
+        "con BNA compatibles con el monto aprobado y la ubicación deseada."
+    ),
+    tags=["Propiedades"],
+)
+def buscar_propiedades(precio_max: int, localidad: str):
+    """
+    Busca propiedades en +Hogares BNA filtrando por precio máximo y localidad.
+    El precio máximo debe ser el monto del crédito aprobado dividido 0.75.
+    """
+    localidad_lower = localidad.strip().lower()
+    resultados = [
+        p for p in PROPIEDADES_DB
+        if p["precio_pesos"] <= precio_max
+        and localidad_lower in p["localidad"].lower()
+    ]
+    if not resultados:
+        resultados = [
+            p for p in PROPIEDADES_DB
+            if p["precio_pesos"] <= precio_max
+        ]
+    if not resultados:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No se encontraron propiedades disponibles para los filtros indicados.",
+        )
+    return resultados
+
+
+@app.post(
+    "/propiedades/{id}/reserva",
+    response_model=ReservaResponse,
+    summary="Reservar una propiedad en +Hogares BNA",
+    description="Genera una reserva sobre la propiedad seleccionada para el solicitante.",
+    tags=["Propiedades"],
+)
+def reservar_propiedad(id: str, body: ReservaRequest):
+    """Genera una reserva de la propiedad indicada para el solicitante."""
+    propiedad = next((p for p in PROPIEDADES_DB if p["id"] == id), None)
+    if not propiedad:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Propiedad {id} no encontrada.",
+        )
+    if id in RESERVAS_DB:
+        raise HTTPException(
+            status_code=409,
+            detail=f"La propiedad {id} ya tiene una reserva activa.",
+        )
+    import uuid
+    id_reserva = f"RES-2026-{str(uuid.uuid4())[:6].upper()}"
+    RESERVAS_DB[id] = {
+        "id_reserva": id_reserva,
+        "cuil_cliente": body.cuil_cliente,
+        "nombre_cliente": body.nombre_cliente,
+    }
+    return {
+        "id_reserva": id_reserva,
+        "id_propiedad": id,
+        "confirmada": True,
+        "vigencia_dias": 10,
+        "mensaje": f"Reserva confirmada para {propiedad['direccion']}. Tenés 10 días para avanzar con la tasación.",
+    }
